@@ -1,0 +1,9 @@
+2 day:
+	1.基本爬虫的流程
+	2.lxml库的使用
+	3.一些零碎的知识	 decode,encode
+				str
+				str.strip
+				with open() as f:
+				for i in 
+				..			
