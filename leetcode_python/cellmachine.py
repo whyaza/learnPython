@@ -1,82 +1,119 @@
 import time, curses
 import random
 import os
+import copy
 
-LVD = 61.8
+cells = []
+HEIGHT = os.get_terminal_size().lines
+WIDTH = os.get_terminal_size().columns
+class OuterScreenException(Exception):
+    pass
 
 def init():
-    cells = []
-    width = os.get_terminal_size().columns
-    height = os.get_terminal_size().lines
-    for i in range(1,width-1):
-        for j in range(1,height-1):
-            if random.randint(1,100) >= LVD:
-                y,x = range(1,width - 1) , range(1,height-1)
-                if [y,x,True] not in cells:
-                    cells.append([j,i,True])
-                    stdscr.addstr(j,i,'@')
-    # while True:
-        # c = stdscr.getch()
-        # (y,x) = stdscr.getyx()
-        # if c == ord('o') or c == ord('O'):
-            # break
-        # elif c == ord(' '):
-            # cells.append([y,x,True])
-            # stdscr.addstr(y,x,'@')
-        # elif c == curses.KEY_UP:
-            # stdscr.move(y-1,x)
-        # elif c == curses.KEY_LEFT:
-            # stdscr.move(y,x-1)
-        # elif c == curses.KEY_DOWN:
-            # stdscr.move(y+1,x)
-        # elif c == curses.KEY_RIGHT:
-            # stdscr.move(y,x+1)
-    return cells
+    while True:
+        c = stdscr.getch()
+        (y,x) = stdscr.getyx()
+        if c == ord('O') or c == ord('o'):
+            break
+        elif c == ord(' '):
+            if [y,x,True] not in cells: #禁止重复添加
+                cells.append([y,x,True])
+                stdscr.addstr(y,x,'@')
+        elif c == curses.KEY_UP:
+            stdscr.move(y-1,x)
+        elif c == curses.KEY_LEFT:
+            stdscr.move(y,x-1)
+        elif c == curses.KEY_DOWN:
+            stdscr.move(y+1,x)
+        elif c == curses.KEY_RIGHT:
+            stdscr.move(y,x+1)
 
 def draw():
-    for cell in cells:
-        if cell[2] == True:
-            stdscr.addstr(cell[0],cell[1],'@')
-        else:
-            stdscr.addstr(cell[0],cell[1],' ')
+    stdscr.erase()
     stdscr.refresh()
-    time.sleep(0.5)
+    try :
+        for cell in cells:
+            stdscr.addstr(cell[0],cell[1],'@')
+        stdscr.refresh()
+    except :
+        raise OuterScreenException
 
-def main(stdscr):
-    #每个细胞有两种状态 - 存活或死亡，每个细胞与以自身为中心的周围八格细胞产生互动。（如图，黑色为存活，白色为死亡）
-    #当前细胞为存活状态时，当周围低于2个（不包含2个）存活细胞时， 该细胞变成死亡状态。（模拟生命数量稀少）
-    #当前细胞为存活状态时，当周围有2个或3个存活细胞时， 该细胞保持原样。
-    #当前细胞为存活状态时，当周围有3个以上的存活细胞时，该细胞变成死亡状态。（模拟生命数量过多）
-    #当前细胞为死亡状态时，当周围有3个存活细胞时，该细胞变成存活状态。 （模拟繁殖）
-    #-> 0,1,4,5,6,7,8 :死亡  2:原样 3:原样
-    near_pos = [(-1,-1),(-1,0),(-1,1),(0,-1),(0,1),(1,-1),(1,0),(1,1)]  #(y,x)
+def play():
+    #设定规则:
+#     每个细胞有两种状态 - 存活或死亡，每个细胞与以自身为中心的周围八格细胞产生互动。（如图，黑色为存活，白色为死亡）
+    # 当前细胞为存活状态时，当周围低于2个（不包含2个）存活细胞时， 该细胞变成死亡状态。（模拟生命数量稀少）
+    # 当前细胞为存活状态时，当周围有2个或3个存活细胞时， 该细胞保持原样。
+    # 当前细胞为存活状态时，当周围有3个以上的存活细胞时，该细胞变成死亡状态。（模拟生命数量过多）
+    # 当前细胞为死亡状态时，当周围有3个存活细胞时，该细胞变成存活状态。 （模拟繁殖）
+    poss = ((-1,-1),(0,-1),(1,-1),(-1,0),(1,0),(-1,1),(0,1),(1,1))
+    global cells
     while len(cells):
+        
+        for ls in range(len(cells)):
+            for pos in poss:
+                tempx = cells[ls][1] + pos[0]
+                tempy = cells[ls][0] + pos[1]
+                if ([tempy,tempx,True] not in cells) and ([tempy,tempx,False] not in cells):
+                    cells.append( [tempy,tempx,False] )
+
+        temp_cells = []
         for cell in cells:
             nearcs = 0
-            for pos in near_pos:
-                tempx = cell[0]+pos[0]
-                tempy = cell[1]+pos[1]
-                if [tempx,tempy,True] in cells:
+            for pos in poss:
+                tempx = cell[1] + pos[0]
+                tempy = cell[0] + pos[1]
+                if [tempy,tempx,True] in cells: #周围的细胞还活着
                     nearcs += 1
-            if cell[2] is True: #当前细胞为存活状态
+            if cell[2] == True:   #该细胞为存活状态
                 if nearcs < 2:
-                    cell[2] = False
-                elif 2 <= nearcs <= 3:
                     pass
-                elif nearcs >= 4:
-                    cell[2] = False
-            else :  #当前细胞为死亡状态
-                if nearcs == 3 or nearcs == 4 or nearcs == 2:
-                    cell[2] = True
-        draw()
+                elif nearcs == 2 or nearcs == 3:
+                    temp_cells.append( [cell[0],cell[1],True] )
+                elif nearcs > 3:
+                    pass
+            else:   #细胞为死亡状态
+                if nearcs == 3:
+                    temp_cells.append( [cell[0],cell[1],True] )
+        
+        #for cell in temp_cells:
+        #    print(cell[0],cell[1],cell[2])
+        
+        cells = copy.copy(temp_cells) 
+        try:
+            draw()
+        except OuterScreenException as e:
+            return
+        time.sleep(1)
+        
+def main(stdscr):
+    global cells
+    while True:
+        cells = []
+        stdscr.erase()
+        stdscr.move(HEIGHT//2,WIDTH//2)
+        init()
+        play()
+
+info = '''
+            细胞自动机游戏说明:
+            1.按b/B键开始游戏,
+            2.键盘上下左右控制光标移动,空格设置初始细胞,o/O键开始启动细胞自动机
+            3.细胞自动机如果细胞移动出屏幕 or len(细胞) == 0时刻,会自动关闭
+            4.祝您玩的愉快!~
+'''
 
 stdscr = curses.initscr()
 curses.noecho()
 curses.cbreak()
 stdscr.keypad(1)
 stdscr.box()
-stdscr.move(20,20)
-cells = init()
+stdscr.addstr(10,10,info,curses.A_BOLD)
+while True:
+    c = stdscr.getch()
+    if c == ord('B') or c == ord('b'):
+        break
+stdscr.erase()
+stdscr.move(HEIGHT//2,WIDTH//2)
 curses.wrapper(main)
 
 
